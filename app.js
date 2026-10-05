@@ -18,6 +18,58 @@ const S = { screen: 'home', tables: tables0, mode: LS.get('pm_mode', 'mini'), N:
 const app = $('#app');
 const T = { run: false, left: 0, total: 1, last: 0, ticked: -1 };
 
+/* ---------- sesli okuma ---------- */
+let voiceOn = LS.get('pm_voice', '1') === '1', voiceWarm = false;
+function speak(txt) {
+  if (!voiceOn || !('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(txt); u.lang = LANG === 'tr' ? 'tr-TR' : 'en-US'; u.rate = .9; u.pitch = 1.1;
+    const v = speechSynthesis.getVoices().find(x => x.lang && x.lang.toLowerCase().startsWith(LANG)); if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+document.addEventListener('pointerdown', () => { // iPhone için ilk dokunuşta ses motorunu hazırla
+  if (voiceWarm || !('speechSynthesis' in window)) return; voiceWarm = true;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
+}, { once: true });
+
+/* ---------- günlük seri ve rozetler ---------- */
+const dkey = (d = new Date()) => d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+const yest = () => { const y = new Date(); y.setDate(y.getDate() - 1); return y; };
+function getStreak() { const l = LS.get('pm_last', ''); return (l === dkey() || l === dkey(yest())) ? +LS.get('pm_days', 0) : 0; }
+function bumpStreak() {
+  const l = LS.get('pm_last', ''); if (l === dkey()) return;
+  LS.set('pm_days', l === dkey(yest()) ? +LS.get('pm_days', 0) + 1 : 1); LS.set('pm_last', dkey());
+}
+function jget(k) { try { return JSON.parse(LS.get(k, '[]')); } catch (e) { return []; } }
+function getBadges() { return jget('pm_badges'); }
+function allBadges() {
+  const b = [
+    { id: 'first', e: '🌟' }, { id: 'perfect', e: '💯' }, { id: 'three', e: '🏆' }, { id: 'streak10', e: '🔥' },
+    { id: 'detective', e: '🔍' }, { id: 'explorer', e: '🗺️' }, { id: 'day3', e: '📅' }, { id: 'day7', e: '🏅' }
+  ].map(x => ({ ...x, name: t('b_' + x.id), desc: t('bd_' + x.id) }));
+  for (let n = 1; n <= 10; n++) b.push({ id: 't' + n, e: '🧮', name: t('b_table', { n }), desc: t('bd_table', { n }) });
+  return b;
+}
+function awardAfterGame(done, stars, acc) {
+  bumpStreak(); const ids = [];
+  if (done) {
+    ids.push('first');
+    const pl = jget('pm_played'); if (!pl.includes(S.world)) { pl.push(S.world); LS.set('pm_played', JSON.stringify(pl)); }
+    if (pl.length >= WORLDS.length) ids.push('explorer');
+    if (!S.mist.length) ids.push('perfect');
+    if (stars === 3) ids.push('three');
+    if (S.tables.length === 1 && acc >= 90) ids.push('t' + S.tables[0]);
+  }
+  if (S.bestStreak >= 10) ids.push('streak10');
+  if (S.missOk >= 5) ids.push('detective');
+  const d = getStreak(); if (d >= 3) ids.push('day3'); if (d >= 7) ids.push('day7');
+  const got = getBadges(), fresh = ids.filter(i => !got.includes(i));
+  if (fresh.length) LS.set('pm_badges', JSON.stringify(got.concat(fresh)));
+  const all = allBadges(); return fresh.map(id => all.find(b => b.id === id)).filter(Boolean);
+}
+
 /* ---------- zamanlayıcılar ---------- */
 const pending = [];
 function later(fn, ms) { const id = setTimeout(() => { const i = pending.indexOf(id); if (i >= 0) pending.splice(i, 1); fn(); }, ms); pending.push(id); return id; }
@@ -45,7 +97,7 @@ function langBtns() {
   return ['tr', 'en'].map(l => `<button class="ibtn lang ${LANG === l ? 'on' : ''}" data-act="lang" data-l="${l}">${l === 'tr' ? 'TR' : 'EN'}</button>`).join('');
 }
 function soundBtns() {
-  return `<button class="ibtn ${SND.musicOn ? '' : 'off'}" data-act="music" title="${t('music')}">🎵</button><button class="ibtn ${SND.sfxOn ? '' : 'off'}" data-act="sfx" title="${t('sfx')}">🔊</button>`;
+  return `<button class="ibtn ${voiceOn ? '' : 'off'}" data-act="voice" title="${t('voice')}">🗣️</button><button class="ibtn ${SND.musicOn ? '' : 'off'}" data-act="music" title="${t('music')}">🎵</button><button class="ibtn ${SND.sfxOn ? '' : 'off'}" data-act="sfx" title="${t('sfx')}">🔊</button>`;
 }
 const wm = () => 'PlayMath'.split('').map((c, i) => `<span style="color:${['#ff5d8f', '#ffd23f', '#3ddc84', '#3ea8ff', '#ff9f1c', '#b46bff', '#ff5d8f', '#ffd23f'][i]};animation-delay:${i * .09}s">${c}</span>`).join('');
 
@@ -57,11 +109,12 @@ function home() {
       <img class="logo" src="logo.png" alt="" onerror="this.style.display='none'">
       <h1 class="wm">${wm()}</h1>
       <p class="tag">${t('tagline')}</p>
+      ${getStreak() ? `<div class="streakpill">${t('streak_days', { n: getStreak() })}</div>` : ''}
       <div class="deco">✖️ 🚀 🐱 🎈</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
       <button class="btn big" data-act="toTables">▶ ${t('play')}</button>
-      <button class="btn sec" data-act="install">📲 ${t('install')}</button>
+      <div class="mrow"><button class="btn sec" data-act="toBadges">🎖️ ${t('badges')}</button><button class="btn sec" data-act="install">📲 ${t('install')}</button></div>
     </div>
     <div class="credit">${t('made_by')}: <b>Yıldıray Hoca</b><br>${t('contact')}: <a href="mailto:sanalnotum@gmail.com">sanalnotum@gmail.com</a></div>
   </section>`;
@@ -101,6 +154,15 @@ function worldsScreen() {
   </section>`;
 }
 
+function badgesScreen() {
+  S.screen = 'badges'; const got = getBadges();
+  app.innerHTML = `<section class="screen">
+    ${topbar('toHome', t('badges'))}
+    <p class="sub">${getStreak() ? t('streak_days', { n: getStreak() }) : t('badges_sub')}</p>
+    <div class="bgrid">${allBadges().map(b => `<div class="badge ${got.includes(b.id) ? 'on' : ''}"><span class="be">${got.includes(b.id) ? b.e : '🔒'}</span><b>${b.name}</b><small>${b.desc}</small></div>`).join('')}</div>
+  </section>`;
+}
+
 /* ---------- pencere / efektler ---------- */
 function modal(html) { closeModal(); const m = h('div', 'modal', `<div class="mbox">${html}</div>`); app.appendChild(m); return m; }
 function closeModal() { const m = $('.modal', app); if (m) m.remove(); }
@@ -116,7 +178,19 @@ function buildPool() {
   S.tables.forEach(a => { for (let b = 1; b <= 10; b++) { const k = Math.min(a, b) + '_' + Math.max(a, b); if (seen.has(k)) continue; seen.add(k); p.push({ x: a, y: b, d: DIF[a] + DIF[b] + Math.random() * .4 }); } });
   return p.sort((u, v) => u.d - v.d);
 }
-function mkQ(p) { const sw = Math.random() < .5; return { x: sw ? p.y : p.x, y: sw ? p.x : p.y, ans: p.x * p.y, p, key: Math.min(p.x, p.y) + 'x' + Math.max(p.x, p.y) }; }
+function mkQ(p) {
+  const sw = Math.random() < .5;
+  const q = { x: sw ? p.y : p.x, y: sw ? p.x : p.y, prod: p.x * p.y, p, key: Math.min(p.x, p.y) + 'x' + Math.max(p.x, p.y) };
+  q.miss = S.qi >= 4 && Math.random() < (S.level >= 3 ? .35 : .2); // 3 × ? = 21
+  q.ans = q.miss ? q.y : q.prod; return q;
+}
+const qHTML = q => q.miss ? `${q.x} × <em>?</em> = ${q.prod}` : `${q.x} × ${q.y} = <em>?</em>`;
+function makeOptsMiss(q, n) {
+  const a = q.ans, set = new Set();
+  shuffle([a + 1, a - 1, a + 2, a - 2, a + 3, a - 3, q.x]).forEach(v => { if (v > 0 && v <= 12 && v !== a && set.size < n - 1) set.add(v); });
+  let g = 0; while (set.size < n - 1 && g++ < 99) { const v = rnd(1, 12); if (v !== a) set.add(v); }
+  return shuffle([a, ...set]);
+}
 function pickQ() {
   const r = S.retry.findIndex(o => o.due <= S.qi);
   if (r >= 0) return mkQ(S.retry.splice(r, 1)[0].p);
@@ -128,6 +202,7 @@ function pickQ() {
   const p = cand[rnd(0, cand.length - 1)]; S.recent.push(p.x + 'x' + p.y); return mkQ(p);
 }
 function makeOpts(q, n) {
+  if (q.miss) return makeOptsMiss(q, n);
   const a = q.ans, set = new Set(), c = [a + q.x, a - q.x, a + q.y, a - q.y, a + 1, a - 1, a + 10, a - 10, a + 2, a - 2];
   const s = String(a); if (s.length === 2) c.push(+(s[1] + s[0]));
   shuffle(c).forEach(v => { if (v > 0 && v !== a && set.size < n - 1) set.add(v); });
@@ -160,7 +235,7 @@ function dotGrid(x, y) {
 /* ---------- oyun akışı ---------- */
 function startGame(id) {
   clearLater(); closeModal();
-  Object.assign(S, { screen: 'game', world: id, game: GAMES[id], lives: 3, score: 0, level: 1, qi: 0, correct: 0, streak: 0, bestStreak: 0, mist: [], retry: [], recent: [], paused: false, locked: true, q: null });
+  Object.assign(S, { screen: 'game', world: id, game: GAMES[id], lives: 3, score: 0, level: 1, qi: 0, correct: 0, streak: 0, bestStreak: 0, mist: [], retry: [], recent: [], missOk: 0, paused: false, locked: true, q: null });
   S.pool = buildPool();
   SND.music(id); SND.tempo(1);
   app.innerHTML = `<section class="screen game">
@@ -187,7 +262,8 @@ function nextQ() {
   if (S.lives <= 0 || S.qi >= S.N) return finish();
   const q = pickQ(); S.q = q; S.qi++;
   q.opts = makeOpts(q, optCount()); S.locked = false; S.ms = timeFor();
-  $('#qb').innerHTML = `<span class="qn">${S.qi}/${S.N}</span><span class="qt">${q.x} × ${q.y} = <em>?</em></span>`;
+  $('#qb').innerHTML = `<span class="qn">${S.qi}/${S.N}</span><span class="qt">${qHTML(q)}</span>`;
+  speak(q.miss ? t('sp_m', { x: q.x, p: q.prod }) : t('sp_q', { x: q.x, y: q.y }));
   const old = $('.layer', S.stage); if (old) old.remove();
   const layer = h('div', 'layer'); S.stage.appendChild(layer); S.layer = layer;
   stopTimer(); setBar(1);
@@ -219,7 +295,7 @@ function pickAns(val, el) {
 function onTimeout() { if (S.locked) return; S.locked = true; S.layer.classList.add('freeze'); wrongAns(null, null, true); }
 
 function rightAns(val, el) {
-  S.correct++; S.streak++; S.bestStreak = Math.max(S.bestStreak, S.streak);
+  S.correct++; S.streak++; if (S.q.miss) S.missOk++; S.bestStreak = Math.max(S.bestStreak, S.streak);
   const pts = 10 + Math.round(Math.max(0, T.left / T.total) * 10) + Math.min(S.streak, 5) * 2;
   S.score += pts; SND.sfx('good');
   S.game.react(true, val, el, S.layer);
@@ -240,10 +316,10 @@ function wrongAns(val, el, timeout) {
   hud(); later(() => feedback(timeout), 1100);
 }
 function feedback(timeout) {
-  const q = S.q;
+  const q = S.q; speak(t('sp_a', { x: q.x, y: q.y, p: q.prod }));
   modal(`<h3>${timeout ? '⏰ ' + t('timeup') : '🤔 ' + t('oops')}</h3>
     <p>${t('right_is')}:</p>
-    <div class="fbq">${q.x} × ${q.y} = <b>${q.ans}</b></div>
+    <div class="fbq">${q.miss ? `${q.x} × <b>${q.y}</b> = ${q.prod}` : `${q.x} × ${q.y} = <b>${q.prod}</b>`}</div>
     ${dotGrid(q.x, q.y)}
     <div class="hint">💡 ${hintFor(q.x, q.y)}</div>
     <button class="btn" data-act="fbnext">${t('cont')} ➜</button>`);
@@ -252,7 +328,7 @@ function pause() {
   if (S.screen !== 'game' || S.paused) return;
   S.paused = true; S.stage.classList.add('paused');
   modal(`<h3>⏸️ ${t('paused')}</h3>
-    <div class="mrow"><button class="ibtn ${SND.musicOn ? '' : 'off'}" data-act="music" title="${t('music')}" style="background:#eee">🎵</button><button class="ibtn ${SND.sfxOn ? '' : 'off'}" data-act="sfx" title="${t('sfx')}" style="background:#eee">🔊</button></div>
+    <div class="mrow"><button class="ibtn ${voiceOn ? '' : 'off'}" data-act="voice" title="${t('voice')}" style="background:#eee">🗣️</button><button class="ibtn ${SND.musicOn ? '' : 'off'}" data-act="music" title="${t('music')}" style="background:#eee">🎵</button><button class="ibtn ${SND.sfxOn ? '' : 'off'}" data-act="sfx" title="${t('sfx')}" style="background:#eee">🔊</button></div>
     <button class="btn" data-act="resume">▶ ${t('resume')}</button>
     <button class="btn sec red" data-act="quit">✖ ${t('quit')}</button>`);
 }
@@ -266,6 +342,7 @@ function finish() {
   const key = 'pm_best_' + S.world, prev = +LS.get(key, 0), isBest = S.score > prev;
   if (isBest) LS.set(key, S.score);
   if (stars > +LS.get('pm_stars_' + S.world, 0)) LS.set('pm_stars_' + S.world, stars);
+  const newB = awardAfterGame(done, stars, acc), days = getStreak();
   SND.sfx(done ? 'win' : 'lose'); SND.music('menu'); SND.tempo(1);
   app.innerHTML = `<section class="screen res">
     <div class="rt">${done ? '🏆 ' + t('won') : '💪 ' + t('lost')}</div>
@@ -273,6 +350,8 @@ function finish() {
     <div class="rscore">${S.score}</div>
     <div>${isBest ? '🎉 ' + t('new_best') : t('best') + ': ' + Math.max(prev, S.score)}</div>
     <div class="rrow"><span>✅ ${t('correct_n')}: ${S.correct}</span><span>🎯 ${t('accuracy')}: %${acc}</span><span>🔥 ${t('streak')}: ${S.bestStreak}</span></div>
+    ${days ? `<div>${t('streak_days', { n: days })}</div>` : ''}
+    ${newB.length ? `<h3>🎖️ ${t('new_badge')}</h3><div class="mlist">${newB.map(b => `<span>${b.e} ${b.name}</span>`).join('')}</div>` : ''}
     ${S.mist.length ? `<h3>📚 ${t('review')}</h3><div class="mlist">${S.mist.map(m => `<span>${m.x}×${m.y}=<b>${m.x * m.y}</b></span>`).join('')}</div>` : `<h3>💯 ${t('perfect')}</h3>`}
     <div class="rbtns"><button class="btn big" data-act="again">🔁 ${t('again')}</button>
     <button class="btn sec" data-act="toWorlds">🎮 ${t('other')}</button>
@@ -284,9 +363,11 @@ function finish() {
 /* ---------- olaylar ---------- */
 let deferredInstall = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
-function renderCurrent() { ({ home, tables: tablesScreen, worlds: worldsScreen })[S.screen]?.(); }
+function renderCurrent() { ({ home, tables: tablesScreen, worlds: worldsScreen, badges: badgesScreen })[S.screen]?.(); }
 
 const ACT = {
+  voice: b => { voiceOn = !voiceOn; LS.set('pm_voice', voiceOn ? '1' : '0'); b.classList.toggle('off', !voiceOn); if (!voiceOn && 'speechSynthesis' in window) speechSynthesis.cancel(); },
+  toBadges: () => badgesScreen(),
   toHome: () => home(), toTables: () => tablesScreen(), toWorlds: () => worldsScreen(),
   lang: b => { setLang(b.dataset.l); renderCurrent(); },
   music: b => { SND.toggleMusic(); b.classList.toggle('off', !SND.musicOn); },
@@ -299,7 +380,7 @@ const ACT = {
   world: b => startGame(b.dataset.id),
   again: () => startGame(S.world),
   pause: () => { if (!S.locked) pause(); }, resume: () => resume(),
-  quit: () => { stopTimer(); clearLater(); closeModal(); S.paused = false; SND.music('menu'); SND.tempo(1); worldsScreen(); },
+  quit: () => { if ('speechSynthesis' in window) speechSynthesis.cancel(); stopTimer(); clearLater(); closeModal(); S.paused = false; SND.music('menu'); SND.tempo(1); worldsScreen(); },
   fbnext: () => { closeModal(); if (S.lives <= 0) finish(); else nextQ(); }
 };
 app.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b && ACT[b.dataset.act]) ACT[b.dataset.act](b); });

@@ -1,6 +1,6 @@
 /* PlayMath – sw.js : çevrimdışı çalışma için önbellek
    Dosyaları güncellediğinde aşağıdaki sürüm numarasını artır (v1 → v2 ...) */
-const CACHE = 'playmath-v1';
+const CACHE = 'playmath-v2';
 const FILES = ['./', './index.html', './style.css', './i18n.js', './audio.js', './app.js', './games1.js', './games2.js', './manifest.json', './logo.png'];
 
 self.addEventListener('install', e => {

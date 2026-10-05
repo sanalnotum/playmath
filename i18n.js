@@ -6,6 +6,18 @@ const LS = {
 
 const I18N = {
   tr: {
+    voice: 'Sesli okuma', badges: 'Rozetler', badges_sub: 'Oynadıkça rozet kazan!', new_badge: 'Yeni rozet!',
+    streak_days: '🔥 {n} gün üst üste',
+    sp_q: '{x} çarpı {y} kaç eder?', sp_m: '{x} çarpı kaç, {p} eder?', sp_a: '{x} çarpı {y} eşittir {p}',
+    b_first: 'İlk Adım', bd_first: 'Bir oyunu bitir',
+    b_perfect: 'Kusursuz', bd_perfect: 'Bir oyunu hiç hata yapmadan bitir',
+    b_three: 'Üç Yıldız', bd_three: 'Bir oyundan 3 yıldız al',
+    b_streak10: 'Ateş Topu', bd_streak10: 'Bir oyunda 10 doğru üst üste yap',
+    b_detective: 'Dedektif', bd_detective: 'Bir oyunda 5 eksik sayıyı bul',
+    b_explorer: 'Kaşif', bd_explorer: 'Tüm oyun alanlarını bitir',
+    b_day3: '3 Gün', bd_day3: '3 gün üst üste oyna',
+    b_day7: 'Haftalık Şampiyon', bd_day7: '7 gün üst üste oyna',
+    b_table: '{n}’li Usta', bd_table: 'Sadece {n}’li tabloyla %90 başarı ile bitir',
     tagline: 'Çarpım tablosunu oynayarak öğren!',
     play: 'Oyna',
     choose_tables: 'Hangi tablolar?',
@@ -68,6 +80,18 @@ const I18N = {
     hd: '{x} × {y} = 5 × {y} + {k} × {y} = {a} + {b} = {p}.'
   },
   en: {
+    voice: 'Read aloud', badges: 'Badges', badges_sub: 'Earn badges as you play!', new_badge: 'New badge!',
+    streak_days: '🔥 {n} days in a row',
+    sp_q: '{x} times {y}?', sp_m: '{x} times what equals {p}?', sp_a: '{x} times {y} equals {p}',
+    b_first: 'First Step', bd_first: 'Finish a game',
+    b_perfect: 'Flawless', bd_perfect: 'Finish a game with no mistakes',
+    b_three: 'Three Stars', bd_three: 'Get 3 stars in a game',
+    b_streak10: 'Fireball', bd_streak10: 'Get 10 right in a row in one game',
+    b_detective: 'Detective', bd_detective: 'Find 5 missing numbers in one game',
+    b_explorer: 'Explorer', bd_explorer: 'Finish every game',
+    b_day3: '3 Days', bd_day3: 'Play 3 days in a row',
+    b_day7: 'Weekly Champion', bd_day7: 'Play 7 days in a row',
+    b_table: 'Master of {n}', bd_table: 'Finish with only the {n} table at 90% or better',
     tagline: 'Learn the times tables by playing!',
     play: 'Play',
     choose_tables: 'Which tables?',
